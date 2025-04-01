@@ -3,6 +3,7 @@ from src.iot.thing import Thing, Parameter, ValueType
 from src.utils.system_commands import SystemCommands
 import logging
 from typing import Dict, Any
+import asyncio
 
 logger = logging.getLogger("SystemManager")
 
@@ -75,11 +76,16 @@ class SystemManager(Thing):
                     "app_name": app_name
                 }
                 
-                # 通过应用程序说出反馈（如果需要）
+                # 直接向应用程序反馈成功信息
                 if self.app:
-                    self.app.schedule(lambda: self.app.set_chat_message(
-                        "assistant", f"已为您打开{app_name}"
-                    ))
+                    try:
+                        # 使用异步方式发送语音反馈
+                        asyncio.run_coroutine_threadsafe(
+                            self.app._speak(f"已为您打开{app_name}"),
+                            self.app.loop
+                        )
+                    except Exception as e:
+                        logger.error(f"发送反馈消息失败: {e}")
             else:
                 result = {
                     "status": "error", 
@@ -88,22 +94,42 @@ class SystemManager(Thing):
                     "app_name": app_name
                 }
                 
-                # 通过应用程序说出错误信息
+                # 直接向应用程序反馈错误信息
                 if self.app:
-                    self.app.schedule(lambda: self.app.set_chat_message(
-                        "assistant", f"抱歉，无法打开{app_name}"
-                    ))
+                    try:
+                        # 使用异步方式发送语音反馈
+                        asyncio.run_coroutine_threadsafe(
+                            self.app._speak(f"抱歉，无法打开{app_name}，请检查应用名称是否正确"),
+                            self.app.loop
+                        )
+                    except Exception as e:
+                        logger.error(f"发送错误反馈消息失败: {e}")
+            
+            # 向服务器发送操作结果状态更新
+            self.app.schedule(lambda: self.app._update_iot_states())
             
             return result
             
         except Exception as e:
             logger.error(f"打开应用程序失败: {str(e)}")
-            return {
+            error_result = {
                 "status": "error", 
                 "message": f"打开应用程序时出错: {str(e)}",
                 "action": "open",
                 "app_name": app_name
             }
+            
+            # 向应用程序反馈错误
+            if self.app:
+                try:
+                    asyncio.run_coroutine_threadsafe(
+                        self.app._speak(f"抱歉，打开{app_name}时出现错误"),
+                        self.app.loop
+                    )
+                except Exception as feedback_err:
+                    logger.error(f"发送错误反馈消息失败: {feedback_err}")
+                    
+            return error_result
     
     def _close_application(self, app_name: str) -> Dict[str, Any]:
         """
@@ -127,11 +153,16 @@ class SystemManager(Thing):
                     "app_name": app_name
                 }
                 
-                # 通过应用程序说出反馈
+                # 直接向应用程序反馈成功信息
                 if self.app:
-                    self.app.schedule(lambda: self.app.set_chat_message(
-                        "assistant", f"已为您关闭{app_name}"
-                    ))
+                    try:
+                        # 使用异步方式发送语音反馈
+                        asyncio.run_coroutine_threadsafe(
+                            self.app._speak(f"已为您关闭{app_name}"),
+                            self.app.loop
+                        )
+                    except Exception as e:
+                        logger.error(f"发送反馈消息失败: {e}")
             else:
                 result = {
                     "status": "error", 
@@ -140,19 +171,39 @@ class SystemManager(Thing):
                     "app_name": app_name
                 }
                 
-                # 通过应用程序说出错误信息
+                # 直接向应用程序反馈错误信息
                 if self.app:
-                    self.app.schedule(lambda: self.app.set_chat_message(
-                        "assistant", f"抱歉，无法关闭{app_name}"
-                    ))
+                    try:
+                        # 使用异步方式发送语音反馈
+                        asyncio.run_coroutine_threadsafe(
+                            self.app._speak(f"抱歉，无法关闭{app_name}，可能该应用未在运行"),
+                            self.app.loop
+                        )
+                    except Exception as e:
+                        logger.error(f"发送错误反馈消息失败: {e}")
+            
+            # 向服务器发送操作结果状态更新
+            self.app.schedule(lambda: self.app._update_iot_states())
             
             return result
             
         except Exception as e:
             logger.error(f"关闭应用程序失败: {str(e)}")
-            return {
+            error_result = {
                 "status": "error", 
                 "message": f"关闭应用程序时出错: {str(e)}",
                 "action": "close",
                 "app_name": app_name
-            } 
+            }
+            
+            # 向应用程序反馈错误
+            if self.app:
+                try:
+                    asyncio.run_coroutine_threadsafe(
+                        self.app._speak(f"抱歉，关闭{app_name}时出现错误"),
+                        self.app.loop
+                    )
+                except Exception as feedback_err:
+                    logger.error(f"发送错误反馈消息失败: {feedback_err}")
+            
+            return error_result 

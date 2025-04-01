@@ -4,12 +4,10 @@ import sys
 import signal
 from src.application import Application
 from src.utils.logging_config import setup_logging
-logger = logging.getLogger("Main")
-# 配置日志
 
 def parse_args():
     """解析命令行参数"""
-    parser = argparse.ArgumentParser(description='小智ai客户端')
+    parser = argparse.ArgumentParser(description='小智助手')
     
     # 添加界面模式参数
     parser.add_argument(
@@ -22,10 +20,13 @@ def parse_args():
     # 添加协议选择参数
     parser.add_argument(
         '--protocol', 
-        choices=['mqtt', 'websocket'], 
+        choices=['websocket', 'mqtt'], 
         default='websocket',
-        help='通信协议：mqtt 或 websocket'
+        help='通信协议：websocket 或 mqtt'
     )
+    
+    parser.add_argument('--debug', action='store_true',
+                      help='启用调试模式')
     
     return parser.parse_args()
 
@@ -36,33 +37,41 @@ def signal_handler(sig, frame):
     app.shutdown()
     sys.exit(0)
 
-
 def main():
-    """程序入口点"""
-    # 注册信号处理器
-    signal.signal(signal.SIGINT, signal_handler)
+    # 配置命令行参数
+    parser = argparse.ArgumentParser(description='小智助手')
+    parser.add_argument('--mode', choices=['gui', 'cli'], default='gui',
+                      help='运行模式：gui（图形界面）或 cli（命令行）')
+    parser.add_argument('--protocol', choices=['websocket', 'mqtt'], default='websocket',
+                      help='通信协议：websocket 或 mqtt')
+    parser.add_argument('--debug', action='store_true',
+                      help='启用调试模式')
+    
     # 解析命令行参数
-    args = parse_args()
+    args = parser.parse_args()
+    
+    # 配置日志
+    logging_level = logging.DEBUG if args.debug else logging.INFO
+    logging.basicConfig(
+        level=logging_level,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    )
+    
+    # 获取应用程序实例并运行
+    app = Application.get_instance()
     try:
-        # 日志
-        setup_logging()
-        # 创建并运行应用程序
-        app = Application.get_instance()
-
-        logger.info("应用程序已启动，按Ctrl+C退出")
-
-        # 启动应用，传入参数
         app.run(
             mode=args.mode,
-            protocol=args.protocol
+            protocol=args.protocol,
+            debug=args.debug
         )
-
+    except KeyboardInterrupt:
+        print("\n程序被用户中断")
+        app.shutdown()
     except Exception as e:
-        logger.error(f"程序发生错误: {e}", exc_info=True)
-        return 1
-
-    return 0
-
+        print(f"程序出现错误: {e}")
+        app.shutdown()
+        sys.exit(1)
 
 if __name__ == "__main__":
-    sys.exit(main())
+    main()

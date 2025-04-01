@@ -427,29 +427,10 @@ class Application:
                 if not text:
                     return
                     
-                # 检查是否是系统命令
-                if "打开" in text or "关闭" in text:
-                    # 转换为物联网命令格式
-                    iot_command = {
-                        "name": "系统命令",
-                        "method": "Query",
-                        "parameters": {
-                            "query": text
-                        }
-                    }
-                    # 处理命令
-                    result = self.system_commands.handle_iot_command(iot_command)
-                    logger.info(f"系统命令执行结果: {result}")
-                    
-                    # 根据执行结果设置回复
-                    if result["success"]:
-                        await self._speak(f"已{result['result']['action']}{result['result']['app_name']}")
-                    else:
-                        await self._speak(f"抱歉，{result['message']}")
-                    
-                    # 系统命令已处理，不再传递给LLM
-                    return
-                    
+                # 注意：我们已移除对系统命令的直接处理
+                # 所有命令（包括"打开"/"关闭"应用）现在都通过LLM处理
+                # 并由LLM生成标准的IoT设备命令格式
+                
             elif msg_type == "system_command":
                 # 直接处理系统命令
                 command_type = json_data.get("command_type")
@@ -464,6 +445,10 @@ class Application:
             elif msg_type == "llm":
                 # 处理LLM消息
                 self._handle_llm_message(json_data)
+                
+            elif msg_type == "iot":
+                # 处理物联网消息
+                self._handle_iot_message(json_data)
                 
             # ... 其他消息类型的处理 ...
             
@@ -1254,6 +1239,8 @@ class Application:
         from src.iot.things.music_player import MusicPlayer
         from src.iot.things.CameraVL.Camera import Camera
         from src.iot.things.query_bridge_rag import QueryBridgeRAG
+        from src.iot.things.system_manager import SystemManager
+        
         # 获取物联网设备管理器实例
         thing_manager = ThingManager.get_instance()
 
@@ -1263,6 +1250,7 @@ class Application:
         thing_manager.add_thing(MusicPlayer())
         thing_manager.add_thing(Camera())
         thing_manager.add_thing(QueryBridgeRAG())
+        thing_manager.add_thing(SystemManager())
         logger.info("物联网设备初始化完成")
 
     def _handle_iot_message(self, data):

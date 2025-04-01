@@ -103,7 +103,8 @@ class WebsocketProtocol(Protocol):
                             await self._handle_server_hello(data)
                         else:
                             if self.on_incoming_json:
-                                self.on_incoming_json(data)
+                                # 创建一个新的任务来处理异步回调
+                                asyncio.create_task(self.on_incoming_json(data))
                     except json.JSONDecodeError as e:
                         logger.error(f"无效的JSON消息: {message}, 错误: {e}")
                 elif self.on_incoming_audio:  # 使用 elif 更清晰

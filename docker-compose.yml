@@ -1,0 +1,13 @@
+version: '3.8'
+
+services:
+  xiaozhi:
+    build: .
+    container_name: py-xiaozhi
+    volumes:
+      - .:/app
+    environment:
+      - PYTHONUNBUFFERED=1
+    network_mode: host
+    privileged: true
+    restart: unless-stopped

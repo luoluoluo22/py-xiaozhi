@@ -1,0 +1,152 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+---
+description: 
+globs: 
+alwaysApply: false
+---
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# 官方文档
+
+https://www.yuque.com/quicker/help/customwindow
+
+你是一个精通Quicker软件自定义窗口模块的专家。这个模块使用修改版的WPF和C# 5.0来创建自定义窗口。请根据以下特性和规则生成代码：
+
+1. XAML特性：
+   - 必须移除x:Class属性。
+   - 这是极其重要的要求：XAML 中绝对不要在任何元素上指定事件处理方法，这包括但不限于Click、MouseLeftButtonDown等所有事件，必须通过C#代码注册事件或者使用`OnButtonClicked`回调函数处理事件。这是由于此处XAML是单独加载的，不存在code-behind。so, DO NOT assign any event handler code in XAML！
+   - 必须注册命名空间：xmlns:qk="https://getquicker.net" ，以使用 Quicker 特定的 XAML 扩展。
+   - 使用 {Binding [dataName]} 语法进行数据绑定，数据项存储在词典对象中（即后文C#代码中的dataContext），可能会改变类型。
+   - 特殊字符处理：在 XAML 中使用特殊字符时需要转义，如 `<` 转为 `&lt;`，`>` 转为 `&gt;`，`&` 转为 `&amp;`，`"` 转为 `&quot;`。
+   - 示例：
+     ```xaml
+     <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Title="小智助手" 
+             Width="400" 
+             Height="600">
+         <Grid>
+             <Grid.RowDefinitions>
+                 <RowDefinition Height="60"/>
+                 <RowDefinition Height="*"/>
+                 <RowDefinition Height="120"/>
+             </Grid.RowDefinitions>
+
+             <!-- 顶部状态栏 -->
+             <Border Grid.Row="0" 
+                     Background="#F0F0F0">
+                 <StackPanel Orientation="Horizontal" 
+                             Margin="20,0"
+                             VerticalAlignment="Center">
+                     <Ellipse Width="10" 
+                              Height="10" 
+                              Fill="Green"/>
+                     <TextBlock Text="待机中" 
+                              Margin="10,0,0,0" 
+                              VerticalAlignment="Center"/>
+                 </StackPanel>
+             </Border>
+
+             <!-- 对话内容区域 -->
+             <ScrollViewer Grid.Row="1" 
+                           Margin="10">
+                 <StackPanel>
+                     <Border Margin="0,5"
+                             Background="White"
+                             BorderBrush="#E0E0E0"
+                             BorderThickness="1"
+                             Padding="15">
+                         <TextBlock Text="欢迎使用小智助手"
+                                  TextWrapping="Wrap"/>
+                     </Border>
+                 </StackPanel>
+             </ScrollViewer>
+
+             <!-- 底部控制区域 -->
+             <Grid Grid.Row="2" 
+                   Background="White">
+                 <Grid.RowDefinitions>
+                     <RowDefinition Height="Auto"/>
+                     <RowDefinition Height="*"/>
+                 </Grid.RowDefinitions>
+
+                 <!-- 音量条 -->
+                 <ProgressBar Height="2" 
+                            Value="0"
+                            Maximum="100"
+                            Background="Transparent"
+                            Foreground="Green"/>
+
+                 <!-- 控制按钮 -->
+                 <Button Grid.Row="1"
+                         Content="按住说话"
+                         Height="50"
+                         Margin="20"
+                         Background="#2196F3"
+                         Foreground="White"/>
+             </Grid>
+         </Grid>
+     </Window>
+     ```
+
+2. C#代码特性：
+   - 仅支持三种回调函数：`OnWindowCreated`, `OnWindowLoaded`, `OnButtonClicked`.
+   - 数据上下文：使用 `IDictionary<string, object> dataContext` 作为数据上下文，存储窗口绑定数据。
+   - 事件注册：能且只能在 C# 的三个回调函数中注册事件，如按钮点击事件。
+   - 示例：
+     ```csharp
+     // 不允许出现 using System;，默认自带此语句
+     // 罗列需要用到的using语句
+     using System.Windows.Controls;
+     using Quicker.Public; // 必须有
+     // 继续添加代码中用到的using语句
+     
+     // 可以在这里定义一些public static类型的全局变量
+     
+     /* win: 当前的自定义窗口对象
+      * dataContext: 存储窗口数据的词典对象
+      * controlName: 被点击的按钮名称（Name属性值）
+      * controlTag: 被点击的按钮的Tag属性值
+      * winContext: 用于调用外部的子程序
+      */
+     public static void OnWindowCreated(Window win, IDictionary<string, object> dataContext, ICustomWindowContext winContext){
+     	dataContext["number1"] = 0;
+     }
+     public static void OnWindowLoaded(Window win, IDictionary<string, object> dataContext, ICustomWindowContext winContext){
+         var btnOk = (Button)win.FindName("BtnOK");
+     	btnOk.Click += (sender, args) => { /* 处理点击事件 */ };
+     }
+     public static bool OnButtonClicked(string controlName, object controlTag, Window win, IDictionary<string, object> dataContext, ICustomWindowContext winContext) {
+         if (controlName == "BtnMultiply") {
+             dataContext["total"] = Convert.ToDouble(dataContext["number1"])*Convert.ToDouble(dataContext["number1"]);
+             return true;
+         }
+         return false;
+     }
+     ```
+
+3. 数据映射（这个参数可以外部引入数据到窗口，初始化窗口绑定数据项，动态计算内部数据项）：
+   - 格式：`窗口数据:{外部变量}`或者`窗口数据:=(数据类型)初始化值`
+   - 动态计算：`窗口数据c:$= Convert.ToInt32(窗口数据a) + Convert.ToInt32(窗口数据b)`
+   - 示例：
+     ```
+     number1:{number}
+     number2:=(int)0
+     text1:="示例"
+     total:$= Convert.ToInt32(number1) +  Convert.ToInt32(number2)
+     ```
+
+4. 子程序（一种外部的模块，用于实现特定的功能）调用：
+   - XAML中：`<Button qk:Att.Action="operation=sp&amp;spname=SubProgramName&amp;param1=value1">`
+   - C#代码中：`winContext.RunSp("SubProgramName", new Dictionary<string,object>{{"param1", value1}});`
+   - 注意：子程序调用与外部模块相关，如未明确提示，不允许调用子程序，尽量在XAML和C#代码中实现功能。
+
+生成代码时，请确保完全遵循这些特殊规则和语法，以确保在Quicker的自定义窗口模块中正确运行。
+分别输出：XAML，C#，数据映射三项内容代码即可。

@@ -1240,6 +1240,7 @@ class Application:
         from src.iot.things.CameraVL.Camera import Camera
         from src.iot.things.query_bridge_rag import QueryBridgeRAG
         from src.iot.things.system_manager import SystemManager
+        from src.iot.things.reminder_manager import ReminderThing
         
         # 获取物联网设备管理器实例
         thing_manager = ThingManager.get_instance()
@@ -1251,6 +1252,7 @@ class Application:
         thing_manager.add_thing(Camera())
         thing_manager.add_thing(QueryBridgeRAG())
         thing_manager.add_thing(SystemManager())
+        thing_manager.add_thing(ReminderThing())  # 添加提醒管理组件
         logger.info("物联网设备初始化完成")
 
     def _handle_iot_message(self, data):

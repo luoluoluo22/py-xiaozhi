@@ -8,6 +8,9 @@ import json
 import time
 import win32com.client
 from distutils.spawn import find_executable
+from src.utils.reminder import ReminderManager
+from src.utils.reminder_commands import process_reminder_command, process_countdown_command
+import re
 
 logger = logging.getLogger(__name__)
 
@@ -1042,6 +1045,24 @@ class SystemCommands:
                             "app_name": app_name,
                             "success": False
                         }
+                
+                # 处理提醒命令
+                elif "提醒" in query or "闹钟" in query or "定时" in query:
+                    # 使用提醒命令处理模块处理
+                    logger.info(f"检测到提醒命令: {query}")
+                    return process_reminder_command(query)
+                    
+                # 处理倒计时命令
+                elif "倒计时" in query:
+                    # 使用倒计时命令处理模块处理
+                    logger.info(f"检测到倒计时命令: {query}")
+                    return process_countdown_command(query)
+                
+                # 处理时间+后的格式（如"10s后"、"5分钟后"等）
+                elif re.search(r'\d+\s*(?:秒钟|秒|分钟|分|小时|s|sec|m|min|h|hour)后?', query, re.IGNORECASE):
+                    logger.info(f"检测到时间提醒命令: {query}")
+                    return process_reminder_command(query)
+                        
                 else:
                     logger.warning(f"未识别的查询命令: {query}")
                     return {

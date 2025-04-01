@@ -303,27 +303,22 @@ class SystemCommands:
     @staticmethod
     def _clean_app_name(app_name: str) -> str:
         """
-        清理应用程序名称，移除常见前缀和后缀
+        清理和标准化应用程序名称
         
-        参数:
+        Args:
             app_name: 原始应用程序名称
             
-        返回:
-            str: 清理后的应用程序名称
+        Returns:
+            str: 标准化后的应用程序名称
         """
-        # 移除常见前缀
-        prefixes = ["打开", "启动", "运行", "执行", "开启", "start", "open", "run", "execute"]
-        for prefix in prefixes:
-            if app_name.lower().startswith(prefix.lower()):
-                app_name = app_name[len(prefix):].strip()
-                break
-                
-        # 移除常见后缀
-        suffixes = ["程序", "软件", "应用", "app", "application", "program"]
+        # 去除前后空格
+        app_name = app_name.strip()
+        
+        # 去除"应用"、"软件"、"程序"等后缀
+        suffixes = ["应用", "软件", "程序", "app", "客户端"]
         for suffix in suffixes:
-            if app_name.lower().endswith(suffix.lower()):
+            if app_name.lower().endswith(suffix):
                 app_name = app_name[:-len(suffix)].strip()
-                break
                 
         return app_name
 
@@ -350,6 +345,7 @@ class SystemCommands:
             
             "计算器": "calc.exe",
             "calculator": "calc.exe",
+            "calc": "calc.exe",
             
             "画图": "mspaint.exe",
             "绘图": "mspaint.exe",
@@ -565,7 +561,93 @@ class SystemCommands:
             "飞书": "飞书",
             "字节飞书": "飞书",
             "lark": "飞书",
-            "feishu": "飞书"
+            "feishu": "飞书",
+            
+            # 新增从系统查询到的应用
+            "百度网盘": "百度网盘",
+            "baidu netdisk": "百度网盘",
+            "baidunetdisk": "百度网盘",
+            
+            "potplayer": "PotPlayer",
+            "potplayer64": "PotPlayer",
+            "视频播放器": "PotPlayer",
+            
+            "迅雷": "迅雷",
+            "thunder": "迅雷",
+            "下载工具": "迅雷",
+            
+            "everything": "Everything",
+            "文件搜索": "Everything",
+            "搜索工具": "Everything",
+            
+            "坚果云": "坚果云",
+            "nutstore": "坚果云",
+            "云盘": "坚果云",
+            
+            "向日葵": "向日葵远程控制",
+            "向日葵远程控制": "向日葵远程控制",
+            "远程协助": "向日葵远程控制",
+            "sunlogin": "向日葵远程控制",
+            
+            "cursor": "Cursor",
+            "代码助手": "Cursor",
+            
+            "claude": "Claude",
+            "claude ai": "Claude",
+            
+            "雷电模拟器": "雷电模拟器",
+            "ldplayer": "雷电模拟器",
+            "安卓模拟器": "雷电模拟器",
+            
+            "微信输入法": "微信输入法",
+            "wetype": "微信输入法",
+            
+            "davinci resolve": "DaVinci Resolve",
+            "达芬奇": "DaVinci Resolve",
+            "视频剪辑": "DaVinci Resolve",
+            
+            "剪映": "剪映专业版",
+            "剪映专业版": "剪映专业版",
+            "视频编辑": "剪映专业版",
+            
+            "steam": "Steam",
+            "游戏平台": "Steam",
+            
+            "github": "GitHub",
+            "代码仓库": "GitHub",
+            
+            "git": "Git",
+            "版本控制": "Git",
+            "git bash": "Git Bash",
+            
+            "pixpin": "PixPin",
+            "截图工具": "PixPin",
+            
+            "bandizip": "Bandizip",
+            "解压缩": "Bandizip",
+            "压缩工具": "Bandizip",
+            
+            "mongodb": "MongoDB",
+            "数据库": "MongoDB",
+            
+            "postgresql": "PostgreSQL",
+            "postgres": "PostgreSQL",
+            
+            "ditto": "Ditto",
+            "剪贴板": "Ditto",
+            "剪贴板管理": "Ditto",
+            
+            "quicker": "Quicker",
+            "效率工具": "Quicker",
+            
+            "postman": "Postman",
+            "api测试": "Postman",
+            
+            "ppt": "POWERPNT.EXE",
+            "微软ppt": "POWERPNT.EXE",
+            "计算器": "Calculator.exe",
+            "calculator": "Calculator.exe",
+            "calc": "Calculator.exe"
         }
         
         logger.info(f"尝试打开应用程序: {app_name}")
@@ -680,44 +762,18 @@ class SystemCommands:
             return False
             
     @staticmethod
-    def close_application(app_name: str):
+    def close_application(app_name: str) -> bool:
         """
         关闭指定的应用程序
         
-        参数:
+        Args:
             app_name: 应用程序名称或进程名
             
-        返回:
+        Returns:
             bool: 操作是否成功
         """
-        # 清理应用名称
+        # 清理和标准化应用程序名称
         app_name = SystemCommands._clean_app_name(app_name)
-        
-        # 应用程序映射表（与open_application中相同）
-        app_mapping = {
-            # 系统工具
-            "记事本": "notepad.exe",
-            "笔记本": "notepad.exe",
-            "notepad": "notepad.exe",
-            
-            # 其他映射（省略重复代码）...
-            # 实际使用时请复制open_application中的完整映射表
-        }
-        
-        logger.info(f"尝试关闭应用程序: {app_name}")
-        
-        # 如果在映射表中找到对应的程序名
-        if app_name.lower() in map(str.lower, app_mapping.keys()):
-            # 获取映射的程序名（区分大小写）
-            mapped_name = None
-            for key in app_mapping.keys():
-                if key.lower() == app_name.lower():
-                    mapped_name = app_mapping[key]
-                    break
-                    
-            if mapped_name:
-                logger.info(f"应用程序 '{app_name}' 已映射到 '{mapped_name}'")
-                app_name = mapped_name
         
         # 特殊处理常用应用程序
         special_app_processes = {
@@ -744,8 +800,50 @@ class SystemCommands:
             "powerpoint": "POWERPNT.EXE",
             "ppt": "POWERPNT.EXE",
             "微软ppt": "POWERPNT.EXE",
-            "计算器": "CalculatorApp.exe",
-            "calculator": "CalculatorApp.exe"
+            "计算器": "Calculator.exe",
+            "calculator": "Calculator.exe",
+            "calc": "Calculator.exe",
+            
+            # 新增从系统查询到的应用
+            "百度网盘": "BaiduNetdisk.exe",
+            "网易云音乐": "cloudmusic.exe",
+            "网易云": "cloudmusic.exe",
+            "potplayer": "PotPlayerMini64.exe",
+            "potplayer64": "PotPlayerMini64.exe",
+            "视频播放器": "PotPlayerMini64.exe",
+            "迅雷": "Thunder.exe",
+            "everything": "Everything.exe",
+            "文件搜索": "Everything.exe",
+            "坚果云": "NutstoreClient.exe",
+            "nutstore": "NutstoreClient.exe",
+            "向日葵": "SunloginClient.exe",
+            "向日葵远程控制": "SunloginClient.exe",
+            "cursor": "Cursor.exe",
+            "claude": "claude.exe",
+            "雷电模拟器": "dnplayer.exe",
+            "ldplayer": "dnplayer.exe",
+            "微信输入法": "wetype_server.exe",
+            "wetype": "wetype_server.exe",
+            "davinci resolve": "Resolve.exe",
+            "达芬奇": "Resolve.exe",
+            "剪映": "JianyingPro.exe",
+            "剪映专业版": "JianyingPro.exe",
+            "steam": "steam.exe",
+            "github": "GitHub.exe",
+            "git bash": "git-bash.exe",
+            "git": "git.exe",
+            "pixpin": "PixPin.exe",
+            "bandizip": "Bandizip.exe",
+            "mongodb": "mongod.exe",
+            "postgresql": "postgres.exe",
+            "postgres": "postgres.exe",
+            "ditto": "Ditto.exe",
+            "quicker": "Quicker.exe",
+            "postman": "Postman.exe",
+            "vs code": "Code.exe",
+            "vscode": "Code.exe",
+            "visual studio code": "Code.exe",
+            "visual studio": "devenv.exe"
         }
         
         app_lower = app_name.lower()

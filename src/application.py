@@ -6,10 +6,12 @@ import time
 import sys
 import traceback
 from pathlib import Path
+from typing import Dict, Any
 
 # 在导入 opuslib 之前处理 opus 动态库
 from src.utils.system_info import setup_opus
 from src.utils.tts_utility import TtsUtility
+from src.utils.system_commands import SystemCommands
 from src.constants.constants import (
     DeviceState, EventType, AudioConfig, 
     AbortReason, ListeningMode
@@ -53,6 +55,9 @@ class Application:
 
         # 获取配置管理器实例
         self.config = ConfigManager.get_instance()
+
+        # 添加系统命令工具
+        self.system_commands = SystemCommands()
 
         # 状态变量
         self.device_state = DeviceState.IDLE
@@ -101,6 +106,12 @@ class Application:
         print(kwargs)
         mode = kwargs.get('mode', 'gui')
         protocol = kwargs.get('protocol', 'websocket')
+        debug = kwargs.get('debug', False)  # 添加调试模式参数
+
+        # 如果是调试模式，设置日志级别为DEBUG
+        if debug:
+            logging.getLogger().setLevel(logging.DEBUG)
+            logger.info("已启用调试模式")
 
         # 启动主循环线程
         main_loop_thread = threading.Thread(target=self._main_loop)
@@ -311,6 +322,57 @@ class Application:
             logger.error(traceback.format_exc())
             return False
 
+    async def _speak(self, text: str):
+        """
+        使用TTS播放文本
+        
+        Args:
+            text: 要播放的文本内容
+        """
+        try:
+            tts_utility = TtsUtility(AudioConfig)
+            
+            # 生成 Opus 音频数据包
+            opus_frames = await tts_utility.text_to_opus_audio(text)
+            
+            # 尝试打开音频通道
+            if (not self.protocol.is_audio_channel_opened() and 
+                    DeviceState.IDLE == self.device_state):
+                # 打开音频通道
+                success = await self.protocol.open_audio_channel()
+                if not success:
+                    logger.error("打开音频通道失败")
+                    return
+            
+            # 确认opus帧生成成功
+            if opus_frames:
+                logger.info(f"生成了 {len(opus_frames)} 个 Opus 音频帧")
+                
+                # 设置状态为说话中
+                self.set_device_state(DeviceState.SPEAKING)
+                
+                # 发送音频数据
+                for i, frame in enumerate(opus_frames):
+                    if self.aborted:
+                        logger.info("语音输出被中止")
+                        break
+                    await self.protocol.send_audio(frame)
+                    await asyncio.sleep(0.06)  # 控制播放速度
+                
+                # 如果没有被中止，设置聊天消息
+                if not self.aborted:
+                    self.set_chat_message("assistant", text)
+                
+                return True
+            else:
+                logger.error("生成音频失败")
+                return False
+                
+        except Exception as e:
+            logger.error(f"语音合成失败: {e}")
+            logger.error(traceback.format_exc())
+            return False
+
     def _handle_output_audio(self):
         """处理音频输出"""
         if self.device_state != DeviceState.SPEAKING:
@@ -343,31 +405,70 @@ class Application:
             self.audio_codec.write_audio(data)
             self.events[EventType.AUDIO_OUTPUT_READY_EVENT].set()
 
-    def _on_incoming_json(self, json_data):
-        """接收JSON数据回调"""
+    async def _on_incoming_json(self, json_data: Dict[str, Any]) -> None:
+        """处理收到的JSON数据"""
         try:
-            if not json_data:
+            if not isinstance(json_data, dict):
+                logger.error(f"收到的JSON数据格式无效: {json_data}")
                 return
-
-            # 解析JSON数据
-            if isinstance(json_data, str):
-                data = json.loads(json_data)
-            else:
-                data = json_data
+                
+            logger.info(f"收到JSON数据: {json_data}")
+            
+            # 获取消息类型
+            msg_type = json_data.get("type")
+            if not msg_type:
+                logger.error("JSON数据缺少type字段")
+                return
+                
             # 处理不同类型的消息
-            msg_type = data.get("type", "")
-            if msg_type == "tts":
-                self._handle_tts_message(data)
-            elif msg_type == "stt":
-                self._handle_stt_message(data)
+            if msg_type == "stt":
+                # 获取语音识别文本
+                text = json_data.get("text", "").strip()
+                if not text:
+                    return
+                    
+                # 检查是否是系统命令
+                if "打开" in text or "关闭" in text:
+                    # 转换为物联网命令格式
+                    iot_command = {
+                        "name": "系统命令",
+                        "method": "Query",
+                        "parameters": {
+                            "query": text
+                        }
+                    }
+                    # 处理命令
+                    result = self.system_commands.handle_iot_command(iot_command)
+                    logger.info(f"系统命令执行结果: {result}")
+                    
+                    # 根据执行结果设置回复
+                    if result["success"]:
+                        await self._speak(f"已{result['result']['action']}{result['result']['app_name']}")
+                    else:
+                        await self._speak(f"抱歉，{result['message']}")
+                    
+                    # 系统命令已处理，不再传递给LLM
+                    return
+                    
+            elif msg_type == "system_command":
+                # 直接处理系统命令
+                command_type = json_data.get("command_type")
+                app_name = json_data.get("app_name")
+                if command_type and app_name:
+                    await self._handle_system_command(command_type, app_name)
+                    
+            elif msg_type == "tts":
+                # 处理TTS消息
+                self._handle_tts_message(json_data)
+                
             elif msg_type == "llm":
-                self._handle_llm_message(data)
-            elif msg_type == "iot":
-                self._handle_iot_message(data)
-            else:
-                logger.warning(f"收到未知类型的消息: {msg_type}")
+                # 处理LLM消息
+                self._handle_llm_message(json_data)
+                
+            # ... 其他消息类型的处理 ...
+            
         except Exception as e:
-            logger.error(f"处理JSON消息时出错: {e}")
+            logger.error(f"处理JSON数据时出错: {e}", exc_info=True)
 
     def _handle_tts_message(self, data):
         """处理TTS消息"""
@@ -396,9 +497,9 @@ class Application:
         if self.device_state == DeviceState.IDLE or self.device_state == DeviceState.LISTENING:
             self.set_device_state(DeviceState.SPEAKING)
 
-            # 注释掉恢复VAD检测器的代码
-            # if hasattr(self, 'vad_detector') and self.vad_detector:
-            #     self.vad_detector.resume()
+        # 注释掉恢复VAD检测器的代码
+        # if hasattr(self, 'vad_detector') and self.vad_detector:
+        #     self.vad_detector.resume()
 
     def _handle_tts_stop(self):
         """处理TTS停止事件"""
